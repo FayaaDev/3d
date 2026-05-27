@@ -6,7 +6,7 @@
 // Preview colors use hex strings. STL exports do not preserve color, so use
 // export_part to create separate STLs and assign materials in the slicer.
 
-use <output-dxf-filled-pieces.scad>
+use <filled-pieces.scad>
 
 /* [Export] */
 export_part = "all";       // [all, base, artwork, piece_1, piece_2, piece_3, piece_4, piece_5, piece_6, piece_7]

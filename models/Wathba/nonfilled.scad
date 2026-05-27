@@ -1,10 +1,10 @@
-// Model: output_relief_from_svg.scad
-// Source: ../output.svg
+// Model: output_relief_from_dxf.scad
+// Source: ../output.dxf
 // Units: millimeters
 //
-// Creates a printable raised-relief plaque from the traced SVG artwork.
+// Creates a printable raised-relief plaque from the traced DXF artwork.
 
-source_svg = "../output.svg";
+use <nonfilled_geometry.scad>
 
 /* [Size] */
 target_width = 120;        // [40:1:220] Final artwork width in mm
@@ -23,11 +23,11 @@ show_base = true;          // Add a backing plate
 base_color = "#f8f5ef";    // Backing plate preview color
 artwork_color = "#111111"; // Artwork preview color
 
-// Bounding box measured from OpenSCAD's imported SVG geometry, not the full SVG canvas.
-source_min_x = 212.016344;
-source_min_y = 138.641667;
-source_width = 422.278100;
-source_depth = 181.644131;
+// Bounding box measured from ../output.dxf closed polyline entities.
+source_min_x = 0.000911;
+source_min_y = 0.000000;
+source_width = 1196.985363;
+source_depth = 514.932532;
 
 epsilon = 0.01;
 $fn = 48;
@@ -43,23 +43,23 @@ module main() {
   if (show_base)
     color(base_color) rounded_plate(base_width, base_depth, base_thickness, base_corner_radius);
 
-  color(artwork_color) raised_svg_artwork();
+  color(artwork_color) raised_dxf_artwork();
 }
 
-module raised_svg_artwork() {
+module raised_dxf_artwork() {
   translate([-target_width / 2, -target_depth / 2, show_base ? base_thickness - epsilon : 0])
     scale([scale_factor, scale_factor, 1])
       translate([-source_min_x, -source_min_y, 0])
         linear_extrude(height = relief_height + (show_base ? epsilon : 0), convexity = 10)
-          svg_artwork_2d();
+          dxf_artwork_2d();
 }
 
-module svg_artwork_2d() {
+module dxf_artwork_2d() {
   if (artwork_offset == 0)
-    import(file = source_svg);
+    output_dxf_artwork_2d();
   else
     offset(delta = artwork_offset / scale_factor)
-      import(file = source_svg);
+      output_dxf_artwork_2d();
 }
 
 module rounded_plate(w, d, h, r) {

@@ -2,8 +2,6 @@
 
 This repo turns image artwork into editable, printable OpenSCAD relief models. Act as a practical CAD assistant: preserve artwork intent, repair unsupported imported geometry, expose user controls in the OpenSCAD Customizer bar, and use hex preview colors in final models.
 
-`potrace.md` is legacy scratch documentation and may be deleted. Durable workflow details live in `rules.md` and `.agents/skills/openscad/SKILL.md`.
-
 ## Read First
 
 - Read `rules.md` before creating or reviewing final `.scad` wrappers.
