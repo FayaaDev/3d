@@ -13,8 +13,7 @@ This repo turns image artwork and technical reference drawings into editable, pr
 ## Required Reading
 
 - Read `rules.md` before creating or reviewing final `.scad` wrappers.
-- Use the local `openscad` skill for model creation, DXF repair, previews, validation, and STL export.
-- Use `dxf.md` when investigating old DXF `POLYLINE`, `VERTEX`, or `SEQEND` failures.
+- Use the local `openscad` skill for model creation, previews, validation, and STL export.
 
 ## Repo Standards
 
@@ -26,9 +25,8 @@ This repo turns image artwork and technical reference drawings into editable, pr
 
 ## Workflow Reminder
 
-- Classify PNG inputs before choosing a pathway: technical drawing reconstruction, artistic contour tracing, or hybrid.
+- Classify inputs before choosing one of two pathways: artwork/logo/calligraphy SVG cleanup, or technical drawing reconstruction.
 - Rebuild floor plans, diagrams, and dimensioned layouts directly in OpenSCAD instead of tracing by default.
-- Trace logos, calligraphy, silhouettes, badges, signs, and organic artwork when visual fidelity matters.
-- Convert unsupported DXF imports into native OpenSCAD `polygon()` modules before final wrapper use.
+- Use Inkscape-cleaned SVG paths for logos, calligraphy, silhouettes, badges, signs, and organic artwork when visual fidelity matters.
 - Keep generated geometry separate from editable final wrappers.
 - Validate, preview, export STL, and inspect the sliced result before calling a model ready.
