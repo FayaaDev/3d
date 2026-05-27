@@ -1,0 +1,32 @@
+{
+    "fileFormatVersion": "1",
+    "parameterSets": {
+        "New set 1": {
+            "$fn": "56",
+            "artwork_offset": "0.14999999999999999",
+            "base_chamfer_height": "7",
+            "base_color": "#f2efe8",
+            "base_corner_radius": "6",
+            "base_edge_chamfer": "1.2",
+            "base_margin": "8",
+            "base_thickness": "2.3999999999999999",
+            "epsilon": "0.01",
+            "export_part": "all",
+            "label_color": "#1f2937",
+            "label_height": "2",
+            "main_label_size": "6",
+            "secondary_label_size": "4.5",
+            "show_base": "true",
+            "source_depth": "160",
+            "source_min_x": "0",
+            "source_min_y": "0",
+            "source_width": "168",
+            "target_width": "200",
+            "wall_color": "#111111",
+            "wall_height": "6",
+            "wall_thickness": "4.7999999999999998",
+            "wall_top_bevel_height": "0.69999999999999996",
+            "wall_top_setback": "0.40000000000000002"
+        }
+    }
+}

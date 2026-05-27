@@ -1,0 +1,1 @@
+Generate an OpenSCAD model of a 3D-printable architectural floor plan on a baseplate/plaque. Use raised extruded walls, door gaps, window cutouts, embossed room labels, rounded corners, chamfered/filleted edges, flat bottom, watertight manifold geometry, no floating parts, no zero-thickness surfaces, Parametric control, all dimensions in millimeters.
