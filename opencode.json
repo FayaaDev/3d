@@ -4,10 +4,10 @@
   "command": {
     "artwork": {
       "description": "Turn attached artwork into a 3D-printable OpenSCAD relief plaque.",
-      "template": "Turn the attached artwork into a 3D-printable OpenSCAD relief plaque. If the raster is noisy, preprocess it with ImageMagick; if it is a clean monochrome bitmap, use potrace; then use the local inkscape skill to clean the SVG and the openscad skill to create a parametric final wrapper with millimeter dimensions, printable relief heights, clean manifolds, and STL-ready geometry."
+      "template": "Spawn three subagents to turn the attached artwork into a 3D-printable OpenSCAD relief plaque. If the raster is noisy, use one subagent to preprocess it with ImageMagick; if it is a clean monochrome bitmap, another subagent to use potrace; then a third subagent to use the local inkscape skill to clean the SVG and the openscad skill to create a parametric final wrapper with millimeter dimensions, printable relief heights, clean manifolds, and STL-ready geometry."
     },
     "technicaldrawing": {
-      "description": "Rebuild a floor plan or technical drawing as a parametric OpenSCAD model.",
+      "description": "Spawn subagents rebuild a floor plan or technical drawing as a parametric OpenSCAD model.",
       "template": "Rebuild this floor plan or technical drawing as a clean parametric OpenSCAD model. Do not trace it as final geometry; use the openscad skill to reconstruct named features directly in OpenSCAD with millimeter dimensions, raised walls or cut features as needed, flat printable base geometry, watertight manifolds, and STL-ready output."
     }
   },
