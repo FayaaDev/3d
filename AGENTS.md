@@ -14,6 +14,7 @@ This repo turns image artwork and technical reference drawings into editable, pr
 
 - Read `rules.md` before creating or reviewing final `.scad` wrappers.
 - Use the local `openscad` skill for model creation, previews, validation, and STL export.
+- Use the local `inkscape` skill for existing SVG edits, cleanup, and controlled vector exports.
 
 ## Repo Standards
 
