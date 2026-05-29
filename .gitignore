@@ -1,0 +1,16 @@
+# macOS junk
+.DS_Store
+
+# dependencies
+node_modules/
+
+# env/secrets
+.env
+.env.local
+
+# logs
+*.log
+
+# build outputs
+dist/
+build/
