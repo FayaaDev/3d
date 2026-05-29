@@ -4,11 +4,46 @@
   "command": {
     "artwork": {
       "description": "Turn attached artwork into a 3D-printable OpenSCAD relief plaque.",
-      "template": "Spawn three subagents to turn the attached artwork into a 3D-printable OpenSCAD relief plaque. If the raster is noisy, use one subagent to preprocess it with ImageMagick; if it is a clean monochrome bitmap, another subagent to use potrace; then a third subagent to use the local inkscape skill to clean the SVG and the openscad skill to create a parametric final wrapper with millimeter dimensions, printable relief heights, clean manifolds, and STL-ready geometry."
+      "template": "Spawn the `imagemagick-png-inspector`, `potrace-vectorizer`, and `inkscape-svg-cleaner` subagents to turn the attached artwork into a 3D-printable OpenSCAD relief plaque. Use `imagemagick-png-inspector` to inspect PNG inputs and preprocess noisy rasters with ImageMagick, use `potrace-vectorizer` to convert clean monochrome bitmaps to SVG with potrace, and use `inkscape-svg-cleaner` to clean and normalize the SVG with the local inkscape skill before you use the openscad skill to create a parametric final wrapper with millimeter dimensions, printable relief heights, clean manifolds, and STL-ready geometry."
     },
     "technicaldrawing": {
       "description": "Spawn subagents rebuild a floor plan or technical drawing as a parametric OpenSCAD model.",
       "template": "Rebuild this floor plan or technical drawing as a clean parametric OpenSCAD model. Do not trace it as final geometry; use the openscad skill to reconstruct named features directly in OpenSCAD with millimeter dimensions, raised walls or cut features as needed, flat printable base geometry, watertight manifolds, and STL-ready output."
+    }
+  },
+  "agent": {
+    "imagemagick-png-inspector": {
+      "description": "Inspect PNG artwork and preprocess noisy rasters with ImageMagick before vectorization.",
+      "mode": "subagent",
+      "permission": {
+        "skill": {
+          "openscad": "allow",
+          "inkscape": "allow"
+        }
+      },
+      "prompt": "You are a raster-preprocessing specialist for artwork-to-OpenSCAD workflows. Inspect attached PNG artwork, decide whether it is already suitable for vectorization, and when cleanup is needed use ImageMagick tools such as `magick` and `identify` to normalize contrast, threshold, despeckle, trim, or isolate the printable foreground. Keep changes minimal and reversible, report the exact files you produce, and hand off a clean bitmap ready for potrace or SVG cleanup."
+    },
+    "potrace-vectorizer": {
+      "description": "Convert clean monochrome bitmap artwork into SVG paths with potrace.",
+      "mode": "subagent",
+      "permission": {
+        "skill": {
+          "openscad": "allow",
+          "inkscape": "allow"
+        }
+      },
+      "prompt": "You are a bitmap-to-vector specialist for artwork-to-OpenSCAD workflows. Take a cleaned monochrome raster, verify that it is suitable for tracing, and use potrace to convert it into an SVG with clean path structure and preserved silhouette intent. Prefer the smallest set of commands that produces usable vector output, report the exact files you create, and hand off an SVG that is ready for final cleanup."
+    },
+    "inkscape-svg-cleaner": {
+      "description": "Clean traced or source SVG artwork with Inkscape before OpenSCAD modeling.",
+      "mode": "subagent",
+      "permission": {
+        "skill": {
+          "openscad": "allow",
+          "inkscape": "allow"
+        }
+      },
+      "prompt": "You are an SVG-cleanup specialist for artwork-to-OpenSCAD workflows. Use the local inkscape skill when SVG cleanup or controlled vector edits are needed, and use Inkscape tooling to simplify, normalize, relabel, or split artwork so the final SVG is ready for OpenSCAD relief modeling. Keep geometry faithful to the source, avoid unnecessary edits, report the exact files you produce, and hand off a clean SVG for the main modeling agent."
     }
   },
   "permission": {

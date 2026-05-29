@@ -2,6 +2,12 @@
 
 Always load and follow the `openscad` skill before classifying a source, choosing a conversion pathway, creating or reviewing a final `.scad` wrapper, generating previews, exporting STL files, or assessing slicer readiness.
 
+When raster artwork is involved, offload the image-preparation steps to the
+dedicated subagents: use `@imagemagick-png-inspector` for PNG inspection and
+ImageMagick cleanup, `@potrace-vectorizer` for monochrome bitmap-to-SVG
+conversion, and `@inkscape-svg-cleaner` for the final Inkscape cleanup pass
+before OpenSCAD work continues.
+
 For raster artwork, logos, calligraphy, and similar image inputs that need to become
 OpenSCAD-importable SVGs, use the local `inkscape` skill as the cleanup and
 tracing workflow before importing into OpenSCAD.
@@ -9,6 +15,12 @@ tracing workflow before importing into OpenSCAD.
 When the source is a noisy or low-contrast raster, use ImageMagick first to
 prepare a cleaner monochrome mask by thresholding, flattening transparency,
 cropping, resizing, or boosting contrast as needed.
+
+Reject raster or image inputs that contain visible watermarks, stock-site overlays,
+or repeated branding text/strokes. Do not trace, vectorize, or model directly from
+watermarked artwork. Ask for a clean source image instead, citing print-quality
+reasons: watermarks introduce false edges, tiny junk islands, contour noise,
+unreliable relief detail, and poor OpenSCAD/STL import quality.
 
 When the source is a high-contrast bitmap silhouette or logo, use `potrace` when
 it is the fastest way to generate clean vector paths before the Inkscape cleanup
