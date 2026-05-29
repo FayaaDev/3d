@@ -5,7 +5,7 @@
 $fn = 128;
 epsilon = 0.01;
 
-artwork_svg_path = "../references/kink-tight.svg";
+artwork_svg_path = "../svg/kink-tight.svg";
 artwork_aspect_ratio = 2627.837479 / 1739.739573;
 
 /* [Export] */

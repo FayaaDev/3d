@@ -14,7 +14,7 @@ tracing workflow before importing into OpenSCAD.
 
 When the source is a noisy or low-contrast raster, use ImageMagick first to
 prepare a cleaner monochrome mask by thresholding, flattening transparency,
-cropping, resizing, or boosting contrast as needed.
+cropping, resizing, or boosting contrast as needed then produce a single most detailed and refined PNG. Do not create more than one PNG.
 
 Reject raster or image inputs that contain visible watermarks, stock-site overlays,
 or repeated branding text/strokes. Do not trace, vectorize, or model directly from
@@ -22,7 +22,7 @@ watermarked artwork. Ask for a clean source image instead, citing print-quality
 reasons: watermarks introduce false edges, tiny junk islands, contour noise,
 unreliable relief detail, and poor OpenSCAD/STL import quality.
 
-When the source is a high-contrast bitmap silhouette or logo, use `potrace` when
+When the source is a high-contrast bitmap refined and detailed content, use `potrace` when
 it is the fastest way to generate clean vector paths before the Inkscape cleanup
 pass.
 
