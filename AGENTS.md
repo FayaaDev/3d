@@ -14,6 +14,7 @@ This repo turns image artwork and technical reference drawings into editable, pr
 
 - Read `rules.md` before creating or reviewing final `.scad` wrappers.
 - Use the local `openscad` skill for model creation, previews, validation, and STL export.
+- Use the local `cad-viewer` skill after STL export to return review links for exported STL files.
 - Use the local `inkscape` skill for existing SVG edits, cleanup, and controlled vector exports.
 
 ## Repo Standards
@@ -30,4 +31,5 @@ This repo turns image artwork and technical reference drawings into editable, pr
 - Rebuild floor plans, diagrams, and dimensioned layouts directly in OpenSCAD instead of tracing by default.
 - Use Inkscape-cleaned SVG paths for logos, calligraphy, silhouettes, badges, signs, and organic artwork when visual fidelity matters.
 - Keep generated geometry separate from editable final wrappers.
+- After STL export, use CAD Viewer as an agent-level review handoff; do not auto-start it from export scripts.
 - Validate, preview, export STL, and inspect the sliced result before calling a model ready.

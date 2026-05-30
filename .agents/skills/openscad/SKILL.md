@@ -27,7 +27,7 @@ This skill owns the durable workflow requirements for:
 - technical drawing reconstruction.
 - generated/final file separation.
 - Customizer and hex-color requirements.
-- STL export and OrcaSlicer validation rules.
+- STL export, CAD Viewer handoff, and OrcaSlicer validation rules.
 
 Update this skill whenever the workflow, command syntax, validation expectations, or execution behavior changes.
 
@@ -211,8 +211,9 @@ Run helper scripts from the repo root or from `.agents/skills/openscad/` with ad
 6. Validate final wrappers with the local tools.
 7. Generate multi-angle previews and inspect them visually.
 8. Export STL only after validation and preview inspection pass.
-9. For color/material-separated models, export separate STL files with `export_part`.
-10. Treat OrcaSlicer layer preview as the practical printability checkpoint.
+9. After each successful STL export, load the local `cad-viewer` skill and return a Viewer link for the exported STL path.
+10. For color/material-separated models, export separate STL files with `export_part` and review each exported STL with `cad-viewer`.
+11. Treat OrcaSlicer layer preview as the practical printability checkpoint.
 
 ## Export And Validation
 
@@ -222,6 +223,8 @@ Run helper scripts from the repo root or from `.agents/skills/openscad/` with ad
 - STL does not preserve OpenSCAD preview colors.
 - Export `all` only for single-material preview or monochrome printing.
 - Export `base`, `artwork`, and each `piece_N` separately for multi-material or color-separated printing.
+- After STL export, use the local `cad-viewer` skill to start or reuse CAD Viewer and return review links for the exported STL files.
+- Do not auto-start CAD Viewer from `export-stl.sh`; keep viewer startup as an agent-level post-export handoff.
 - Confirm imported STL dimensions are correct in millimeters.
 - Slice in OrcaSlicer and inspect layer preview before printing or ordering.
 - Check small islands, minimum wall paths, thin strokes, missing holes, unsupported islands, and accidental extra bodies.
@@ -244,6 +247,7 @@ Before reporting a model ready, confirm:
 - OpenSCAD validation passes.
 - previews show the intended model from multiple angles.
 - STL dimensions are correct in millimeters.
+- CAD Viewer links were returned for exported STL files, or Viewer startup failure was reported.
 - OrcaSlicer layer preview shows no missing walls, failed islands, accidental bodies, or unprintable details.
 
 ## Skill Maintenance

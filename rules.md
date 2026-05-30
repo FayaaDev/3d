@@ -2,6 +2,11 @@
 
 Always load and follow the `openscad` skill before classifying a source, choosing a conversion pathway, creating or reviewing a final `.scad` wrapper, generating previews, exporting STL files, or assessing slicer readiness.
 
+After a successful STL export, load and follow the local `cad-viewer` skill to
+return a CAD Viewer review link for each exported STL. Keep this as an
+agent-level handoff; do not auto-start CAD Viewer from the OpenSCAD export
+scripts.
+
 When raster artwork is involved, offload the image-preparation steps to the
 dedicated subagents: use `@imagemagick-png-inspector` for PNG inspection and
 ImageMagick cleanup, `@potrace-vectorizer` for monochrome bitmap-to-SVG
