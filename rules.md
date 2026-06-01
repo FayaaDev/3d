@@ -17,6 +17,18 @@ For raster artwork, logos, calligraphy, and similar image inputs that need to be
 OpenSCAD-importable SVGs, use the local `inkscape` skill as the cleanup and
 tracing workflow before importing into OpenSCAD.
 
+When a workflow is launched from `web/` or another saved command, treat it as
+an unattended run unless the prompt explicitly says a live user is available.
+Do not stop for avoidable clarification when a conservative default preserves
+source fidelity and printability. State the assumption in the final summary
+instead. If a question is truly required, keep it single-select and include a
+clear recommended or default option.
+
+Prefer artifacts derived from the current uploaded source over older similarly
+named traced SVGs, cleaned SVGs, or `.scad` wrappers already in the repo.
+Reuse older artifacts only when they are explicitly verified as matching the
+current source and that reuse is stated.
+
 When the source is a noisy or low-contrast raster, use ImageMagick first to
 prepare a cleaner monochrome mask by thresholding, flattening transparency,
 cropping, resizing, or boosting contrast as needed then produce a single most detailed and refined PNG. Do not create more than one PNG.
@@ -43,5 +55,10 @@ That raster-to-vector preparation should produce:
 
 Prefer a single-color vector-only SVG when the traced color separation introduces edge
 halos or overlapping artifacts that would hurt OpenSCAD import quality.
+
+For local app or saved-command runs, do not consider the cycle complete after
+only producing a `.scad` file or exporting STL files. The expected finish line
+is: final editable `.scad`, validation pass, preview generation, STL export,
+and at least one valid CAD Viewer handoff URL with an absolute `?dir=` value.
 
 Do not infer the image-to-model workflow from this file. If this file and the `openscad` skill ever conflict, the `openscad` skill wins.

@@ -33,3 +33,12 @@ This repo turns image artwork and technical reference drawings into editable, pr
 - Keep generated geometry separate from editable final wrappers.
 - After STL export, use CAD Viewer as an agent-level review handoff; do not auto-start it from export scripts.
 - Validate, preview, export STL, and inspect the sliced result before calling a model ready.
+
+## Unattended Runs
+
+- When work is launched from `web/` or another saved command, assume no live user is present unless the prompt says otherwise.
+- Avoid non-essential clarification in unattended runs. If a conservative default preserves source intent and printability, proceed and state the assumption in the final summary.
+- If a question is truly required in an unattended run, keep it single-select and include a clear recommended or default option.
+- Prefer artifacts generated from the current uploaded source over older similarly named SVGs, cleaned vectors, or `.scad` files already in the repo. Reuse older artifacts only after explicitly verifying the match.
+- For artwork relief runs, preserve the requested object type and uploaded source intent by default. Do not reinterpret a plaque-style prompt into a different object category unless the prompt explicitly asks for it.
+- Treat local app runs as complete only after final `.scad`, validation, previews, STL export, and CAD Viewer handoff are all available unless the caller explicitly asks for a partial checkpoint.
