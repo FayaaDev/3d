@@ -496,7 +496,6 @@ textarea {
 }
 
 .stage-item[data-status="active"] .stage-fill {
-  animation: active-fill 1.6s ease-in-out infinite alternate;
   width: 62%;
 }
 

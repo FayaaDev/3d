@@ -4,7 +4,7 @@
   "command": {
     "artwork": {
       "description": "Turn attached artwork into a 3D-printable OpenSCAD relief plaque.",
-      "template": "Spawn the `imagemagick-png-inspector`, `potrace-vectorizer`, and `inkscape-svg-cleaner` subagents to turn the attached artwork into a 3D-printable OpenSCAD relief plaque. Use `imagemagick-png-inspector` to inspect PNG inputs and preprocess noisy rasters with ImageMagick, use `potrace-vectorizer` to convert clean monochrome bitmaps to SVG with potrace, and use `inkscape-svg-cleaner` to clean and normalize the SVG with the local inkscape skill before you use the openscad skill to create a parametric final wrapper with millimeter dimensions, printable relief heights, clean manifolds, and STL-ready geometry."
+      "template": "Spawn the `imagemagick-png-inspector`, `potrace-vectorizer`, and `inkscape-svg-cleaner` subagents to turn the attached artwork into a 3D-printable OpenSCAD relief plaque. Use `imagemagick-png-inspector` to inspect PNG inputs and preprocess noisy rasters with ImageMagick while preserving meaningful internal artwork structure. Use `potrace-vectorizer` to convert clean monochrome bitmaps to SVG with potrace without collapsing printable internal features to an outline-only trace. Use `inkscape-svg-cleaner` to clean and normalize the SVG with the local inkscape skill before you use the openscad skill to create a parametric final wrapper with millimeter dimensions, printable relief heights, clean manifolds, and STL-ready geometry."
     },
     "technicaldrawing": {
       "description": "Spawn subagents rebuild a floor plan or technical drawing as a parametric OpenSCAD model.",
@@ -32,7 +32,7 @@
           "inkscape": "allow"
         }
       },
-      "prompt": "You are a bitmap-to-vector specialist for artwork-to-OpenSCAD workflows. Take a cleaned monochrome raster, verify that it is suitable for tracing, and use potrace to convert it into an SVG with clean path structure and preserved silhouette intent. Prefer the smallest set of commands that produces usable vector output, report the exact files you create, and hand off an SVG that is ready for final cleanup."
+      "prompt": "You are a bitmap-to-vector specialist for artwork-to-OpenSCAD workflows. Take a cleaned monochrome raster, verify that it is suitable for tracing, and use potrace to convert it into an SVG with clean path structure and preserved internal detail and overall artwork structure. Avoid tracing only the exterior contour when interior features are printable and visually important. Prefer the smallest set of commands that produces usable vector output, report the exact files you create, and hand off an SVG that is ready for final cleanup."
     },
     "inkscape-svg-cleaner": {
       "description": "Clean traced or source SVG artwork with Inkscape before OpenSCAD modeling.",

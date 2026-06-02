@@ -66,7 +66,7 @@ Use exactly these single-select labels:
       "options": [
         {
           "label": "Artwork / logo / calligraphy",
-          "description": "Preserve the visual silhouette as cleaned/imported artwork."
+          "description": "Preserve the cleaned artwork structure, including meaningful internal detail when present."
         },
         {
           "label": "Technical drawing / floor plan / diagram",
@@ -82,7 +82,7 @@ If the user has already classified the source, continue with the matching pathwa
 
 Choose exactly one pathway:
 
-- **Artwork / logo / calligraphy pathway:** Clean the source in Inkscape, save a simple filled SVG, then import the SVG or individual SVG path IDs into a customizable OpenSCAD relief wrapper. Prefer this for logos, calligraphy, silhouettes, badges, signs, and decorative reliefs.
+- **Artwork / logo / calligraphy pathway:** Clean the source in Inkscape, save filled vector artwork as a plain SVG, and keep separated or layered paths when internal detail is important. Then import the SVG or individual SVG path IDs into a customizable OpenSCAD relief wrapper. Prefer this for logos, calligraphy, detailed artwork, silhouettes, badges, signs, and decorative reliefs.
 - **Technical drawing pathway:** Use the source only as a visual reference and rebuild directly in OpenSCAD with clean primitives, descriptive modules, consistent feature widths, intentional openings, and editable dimensions. Prefer this for floor plans, diagrams, mechanical layouts, architectural plaques, and dimensioned objects.
 
 ## Artwork / Logo / Calligraphy Pathway
@@ -92,7 +92,8 @@ Choose exactly one pathway:
 - If the source is raster artwork, use Inkscape's built-in bitmap tracing tools only as a starting point, then clean the resulting paths manually.
 - Delete the original bitmap before saving the SVG so the final file contains vector paths only.
 - Convert strokes to filled paths when strokes define visible geometry.
-- Use `Path > Union` when pieces should become one solid artwork body.
+- Preserve printable internal contours, holes, negative space, and layered detail when they are part of the source intent.
+- Use `Path > Union` only when pieces should become one solid artwork body and merging will not erase meaningful internal features, cutouts, or separations needed for the relief.
 - Use `Path > Break Apart` when pieces need separate material/color exports.
 - Keep piece paths named or identify their SVG IDs so wrappers can import each piece separately.
 - Resize the page to the drawing or selection before saving so bounds are predictable.

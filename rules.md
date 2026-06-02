@@ -32,6 +32,9 @@ current source and that reuse is stated.
 When the source is a noisy or low-contrast raster, use ImageMagick first to
 prepare a cleaner monochrome mask by thresholding, flattening transparency,
 cropping, resizing, or boosting contrast as needed then produce a single most detailed and refined PNG. Do not create more than one PNG.
+Never reduce artwork to an outer silhouette when internal visual detail is part
+of the source. Preserve and refine the internal artwork structure needed for the
+final model instead of tracing only the exterior outline.
 
 Reject raster or image inputs that contain visible watermarks, stock-site overlays,
 or repeated branding text/strokes. Do not trace, vectorize, or model directly from
@@ -39,14 +42,16 @@ watermarked artwork. Ask for a clean source image instead, citing print-quality
 reasons: watermarks introduce false edges, tiny junk islands, contour noise,
 unreliable relief detail, and poor OpenSCAD/STL import quality.
 
-When the source is a high-contrast bitmap refined and detailed content, use `potrace` when
-it is the fastest way to generate clean vector paths before the Inkscape cleanup
-pass.
+When the source is a high-contrast bitmap with refined and detailed content, use
+`potrace` when it is the fastest way to generate clean vector paths before the
+Inkscape cleanup pass, but keep the traced result focused on the artwork's
+internal features rather than a silhouette-only outline.
 
 That raster-to-vector preparation should produce:
 - use ImageMagick only for preprocessing, not as the final editable vector step
 - use `potrace` for monochrome bitmap-to-path conversion when it improves speed or fidelity
 - trace the bitmap into vector paths
+- preserve meaningful internal artwork detail instead of collapsing the image to a silhouette
 - delete the original embedded bitmap from the SVG
 - keep only clean filled vector geometry
 - fit the page to the drawing or selection so bounds are predictable
