@@ -7,6 +7,7 @@ description: >-
   generation, STL export, and OrcaSlicer print-prep guidance. For source files,
   load and follow the local openscad skill before choosing a workflow.
 mode: all
+temperature: 0.2
 permission:
   skill:
     openscad: allow

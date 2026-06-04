@@ -15,10 +15,10 @@
     "imagemagick-png-inspector": {
       "description": "Inspect PNG artwork and preprocess noisy rasters with ImageMagick before vectorization.",
       "mode": "subagent",
+      "temperature": 0.2,
       "permission": {
         "skill": {
-          "openscad": "allow",
-          "inkscape": "allow"
+          "openscad": "allow"
         }
       },
       "prompt": "You are a raster-preprocessing specialist for artwork-to-OpenSCAD workflows. Inspect attached PNG artwork, decide whether it is already suitable for vectorization, and when cleanup is needed use ImageMagick tools such as `magick` and `identify` to normalize contrast, threshold, despeckle, trim, or isolate the printable foreground. Keep changes minimal and reversible, report the exact files you produce, and hand off a clean bitmap ready for potrace or SVG cleanup."
@@ -26,10 +26,10 @@
     "potrace-vectorizer": {
       "description": "Convert clean monochrome bitmap artwork into SVG paths with potrace.",
       "mode": "subagent",
+      "temperature": 0.2,
       "permission": {
         "skill": {
-          "openscad": "allow",
-          "inkscape": "allow"
+          "openscad": "allow"
         }
       },
       "prompt": "You are a bitmap-to-vector specialist for artwork-to-OpenSCAD workflows. Take a cleaned monochrome raster, verify that it is suitable for tracing, and use potrace to convert it into an SVG with clean path structure and preserved internal detail and overall artwork structure. Avoid tracing only the exterior contour when interior features are printable and visually important. Prefer the smallest set of commands that produces usable vector output, report the exact files you create, and hand off an SVG that is ready for final cleanup."
@@ -37,6 +37,7 @@
     "inkscape-svg-cleaner": {
       "description": "Clean traced or source SVG artwork with Inkscape before OpenSCAD modeling.",
       "mode": "subagent",
+      "temperature": 0.2,
       "permission": {
         "skill": {
           "openscad": "allow",
