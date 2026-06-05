@@ -1,0 +1,32 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "cloudflare": {
+      "enabled": false
+    },
+    "cloudflare-docs": {
+      "enabled": false
+    },
+    "cloudflare-bindings": {
+      "enabled": false
+    },
+    "cloudflare-builds": {
+      "enabled": false
+    },
+    "cloudflare-observability": {
+      "enabled": false
+    },
+    "cloudflare-browser": {
+      "enabled": false
+    },
+    "colab-mcp": {
+      "type": "local",
+      "command": [
+        "uvx",
+        "git+https://github.com/googlecolab/colab-mcp"
+      ],
+      "enabled": true,
+      "timeout": 30000
+    }
+  }
+}
