@@ -31,7 +31,6 @@ curl -fsS \
   "https://3dserver.hitem3d.ai/aigc/api/generate/result?jobId=<JOBIDHERE>" | jq
 ```
 
-## Sparc3D Notes
 
 ## Hunyuan3D
 
@@ -49,10 +48,6 @@ Choose another format and output path:
   --output "outputs/robot.stl" \
   "outputs/robot.webp"
 ```
-
-## Notes
-
-`./sparc3d.sh --help` or `./hunyuan3d.sh --help` to see all flags.
 
 ## Pixal3D
 
@@ -73,5 +68,3 @@ Choose another output path and generation settings:
 ```
 
 Pixal3D currently exports `GLB` only through the public Hugging Face Space API.
-
-`./pixal3d.sh --help` to see all flags.

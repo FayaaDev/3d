@@ -12,7 +12,7 @@
     },
     "colab": {
       "description": "Use colab mcp to launch this huggingface model",
-      "template": "Use Colab MCP only. Run the official given model. My input image will already be available at /content/xx.png. Use my Colab secret HF_TOKEN. Do not use fallback Spaces.If GPU/runtime changes are needed, ask me first. Export the final GLB and bring it back into outputs/ as outputs/mush-trellis2.glb. If direct download from the Space isblocked, ask before using any third-party transfer service."
+      "template": "Use Colab MCP only. Do not use chromdev mcp. Run the official given model. Use my Colab secret HF_TOKEN. Do not use fallback Spaces .If GPU/runtime changes are needed, do it. Deploy it to gradio"
     }
   },
   "agent": {
