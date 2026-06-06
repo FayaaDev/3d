@@ -23,7 +23,9 @@
       "type": "local",
       "command": [
         "uvx",
-        "git+https://github.com/googlecolab/colab-mcp"
+        "--from",
+        "git+https://github.com/googlecolab/colab-mcp",
+        "colab-mcp"
       ],
       "enabled": true,
       "timeout": 30000

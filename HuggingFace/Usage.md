@@ -4,6 +4,7 @@ This folder contains two standalone image-to-3D scripts:
 
 - `sparc3d.sh` converts an existing image into `GLB`, `OBJ`, or `STL`.
 - `hunyuan3d.sh` converts an existing image into `GLB`, `OBJ`, `PLY`, or `STL`.
+- `pixal3d.sh` converts an existing image into `GLB`.
 
 ## Sparc3D
 
@@ -52,3 +53,25 @@ Choose another format and output path:
 ## Notes
 
 `./sparc3d.sh --help` or `./hunyuan3d.sh --help` to see all flags.
+
+## Pixal3D
+
+Convert an existing image into a GLB model with Pixal3D:
+
+```bash
+./pixal3d.sh "outputs/robot.webp"
+```
+
+Choose another output path and generation settings:
+
+```bash
+./pixal3d.sh \
+  --output "outputs/robot-pixal.glb" \
+  --resolution 1024 \
+  --seed 42 \
+  "outputs/robot.webp"
+```
+
+Pixal3D currently exports `GLB` only through the public Hugging Face Space API.
+
+`./pixal3d.sh --help` to see all flags.

@@ -9,6 +9,10 @@
     "technicaldrawing": {
       "description": "Spawn subagents rebuild a floor plan or technical drawing as a parametric OpenSCAD model.",
       "template": "Rebuild this floor plan or technical drawing as a clean parametric OpenSCAD model. Do not trace it as final geometry; use the openscad skill to reconstruct named features directly in OpenSCAD with millimeter dimensions, raised walls or cut features as needed, flat printable base geometry, watertight manifolds, and STL-ready output."
+    },
+    "colab": {
+      "description": "Use colab mcp to launch this huggingface model",
+      "template": "Use Colab MCP only. Run the official given model. My input image will already be available at /content/xx.png. Use my Colab secret HF_TOKEN. Do not use fallback Spaces.If GPU/runtime changes are needed, ask me first. Export the final GLB and bring it back into outputs/ as outputs/mush-trellis2.glb. If direct download from the Space isblocked, ask before using any third-party transfer service."
     }
   },
   "agent": {
