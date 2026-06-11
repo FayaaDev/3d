@@ -68,3 +68,5 @@ Choose another output path and generation settings:
 ```
 
 Pixal3D currently exports `GLB` only through the public Hugging Face Space API.
+Generation time: 50s
+Mesh time: 3m

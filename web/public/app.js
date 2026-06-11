@@ -38,8 +38,8 @@ const STAGE_ORDERS = {
 const PATHWAY_COPY = {
   artwork: {
     label: "Artwork",
-    headline: "Vibe Printing3D",
-    summary: "Take your source from upload to a fully printable STL.",
+    headline: "Deterministic Relief Pipeline",
+    summary: "The local pipeline is turning your artwork into an editable OpenSCAD source bundle and printable STL.",
   },
   technicaldrawing: {
     label: "Technical Drawing",
@@ -69,6 +69,8 @@ const dom = {
   resultLabel: document.getElementById("resultLabel"),
   resultText: document.getElementById("resultText"),
   viewerLink: document.getElementById("viewerLink"),
+  downloadLink: document.getElementById("downloadLink"),
+  downloadCadLink: document.getElementById("downloadCadLink"),
   startOverButton: document.getElementById("startOverButton"),
   liveLine: document.getElementById("liveLine"),
   stageList: document.getElementById("stageList"),
@@ -92,12 +94,15 @@ function makeStageList(pathway) {
 function makePlaceholderJob(pathway) {
   return {
     jobId: null,
+    runId: null,
     sessionId: null,
     fileName: state.file?.name ?? "-",
     pathway,
     status: "starting",
-    statusLine: "Starting a fresh OpenCode session.",
+    statusLine: "Starting the local deterministic pipeline.",
     cadViewerUrl: null,
+    stlPath: null,
+    scadPath: null,
     error: null,
     stages: makeStageList(pathway),
   };
@@ -175,6 +180,8 @@ function renderStages(stages) {
 function renderResult(job) {
   const isTerminal = job.status === "completed" || job.status === "failed";
   const hasViewerUrl = Boolean(job.cadViewerUrl);
+  const hasStlDownload = Boolean(job.jobId && job.stlPath);
+  const hasCadDownload = Boolean(job.jobId && job.scadPath);
 
   dom.resultCard.classList.toggle("hidden", !isTerminal);
   dom.startOverButton.classList.toggle("hidden", !isTerminal);
@@ -183,6 +190,10 @@ function renderResult(job) {
     delete dom.resultCard.dataset.state;
     dom.viewerLink.href = "#";
     dom.viewerLink.classList.add("hidden");
+    dom.downloadLink.href = "#";
+    dom.downloadLink.classList.add("hidden");
+    dom.downloadCadLink.href = "#";
+    dom.downloadCadLink.classList.add("hidden");
     return;
   }
 
@@ -206,6 +217,22 @@ function renderResult(job) {
   } else {
     dom.viewerLink.href = "#";
     dom.viewerLink.classList.add("hidden");
+  }
+
+  if (hasStlDownload) {
+    dom.downloadLink.href = `/api/jobs/${job.jobId}/download/stl`;
+    dom.downloadLink.classList.remove("hidden");
+  } else {
+    dom.downloadLink.href = "#";
+    dom.downloadLink.classList.add("hidden");
+  }
+
+  if (hasCadDownload) {
+    dom.downloadCadLink.href = `/api/jobs/${job.jobId}/download/cad`;
+    dom.downloadCadLink.classList.remove("hidden");
+  } else {
+    dom.downloadCadLink.href = "#";
+    dom.downloadCadLink.classList.add("hidden");
   }
 }
 
@@ -237,7 +264,7 @@ function render() {
   dom.summaryFile.textContent = job.fileName;
   dom.summaryPathway.textContent = pathwayCopy.label;
   dom.summaryProgress.textContent = `${completedCount(job.stages)} / ${job.stages.length} complete`;
-  dom.summarySession.textContent = job.sessionId || "Starting...";
+  dom.summarySession.textContent = job.runId || "Starting...";
   dom.summaryCopy.textContent = job.error || pathwayCopy.summary;
   dom.liveLine.textContent = job.statusLine || "Awaiting stage updates.";
 

@@ -4,12 +4,9 @@ import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
-import {
-  createOpencodeClient,
-  createOpencodeServer,
-} from "../.opencode/node_modules/@opencode-ai/sdk/dist/index.js";
+import { createCadViewerUrlForFile } from "./cad-viewer.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const webRoot = path.dirname(__filename);
@@ -18,16 +15,8 @@ const publicDir = path.join(webRoot, "public");
 const uploadsDir = path.join(webRoot, "uploads");
 const exportsDir = path.join(repoRoot, "exports");
 const cadViewerScriptDir = path.join(repoRoot, ".agents", "skills", "cad-viewer", "scripts", "viewer");
-const cadViewerHost = "127.0.0.1";
-const cadViewerStartPort = 4178;
+const pipelineScriptPath = path.join(repoRoot, "scripts", "artwork-relief-pipeline.mjs");
 const port = Number(process.env.PORT || 4317);
-const opencodeHost = process.env.OPENCODE_HOST || "127.0.0.1";
-const opencodePort = Number(process.env.OPENCODE_PORT || 4096);
-
-const commandByPathway = {
-  artwork: "artwork",
-  technicaldrawing: "technicaldrawing",
-};
 
 const stageOrderByPathway = {
   artwork: [
@@ -74,77 +63,60 @@ const staticFiles = {
 
 const terminalStatuses = new Set(["completed", "failed"]);
 const pngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
-const artworkSubagentStageByType = {
-  "imagemagick-png-inspector": "magicimage",
-  "potrace-vectorizer": "potrace",
-  "inkscape-svg-cleaner": "svg_cleanup",
-};
 
 const jobs = new Map();
 let activeJobId = null;
-let opencodeRuntimePromise = null;
 
-ensureLocalOpencodePath();
 await fs.mkdir(uploadsDir, { recursive: true });
-
-function ensureLocalOpencodePath() {
-  const localBinDir = path.join(os.homedir(), ".opencode", "bin");
-  const currentPath = process.env.PATH ?? "";
-
-  if (!currentPath.split(path.delimiter).includes(localBinDir)) {
-    process.env.PATH = `${localBinDir}${path.delimiter}${currentPath}`;
-  }
-}
+await fs.mkdir(exportsDir, { recursive: true });
 
 function createStages(pathway) {
   return stageOrderByPathway[pathway].map((key) => ({
     key,
     label: stageLabels[key],
-    status: "pending",
+    status: key === "upload" || key === "choice" ? "completed" : "pending",
   }));
 }
 
-function createJob({ fileName, pathway, storedFilePath }) {
+function createJob({ fileName, pathway, storedFilePath, outputDir, artifactName }) {
   const jobId = randomUUID();
-  const stages = createStages(pathway);
-
-  for (const stage of stages) {
-    if (stage.key === "upload" || stage.key === "choice") {
-      stage.status = "completed";
-    }
-  }
 
   return {
     id: jobId,
-    sessionId: null,
-    commandName: commandByPathway[pathway],
+    runId: jobId.slice(0, 8),
     fileName,
     pathway,
     storedFilePath,
+    outputDir,
+    artifactName,
     status: "starting",
-    statusLine: "Saved the file locally. Starting OpenCode.",
+    statusLine: "Saved the file locally. Starting the deterministic pipeline.",
     cadViewerUrl: null,
+    stlPath: null,
+    scadPath: null,
     error: null,
-    stages,
+    stages: createStages(pathway),
     currentStageKey: null,
-    commandStarted: false,
-    finalizing: false,
-    knownSessionIds: new Set(),
     clients: new Set(),
     lastSnapshot: "",
-    eventAbortController: null,
+    manifestPath: null,
+    childProcess: null,
+    stderrBuffer: "",
   };
 }
 
 function snapshotJob(job) {
   return {
     jobId: job.id,
-    sessionId: job.sessionId,
+    runId: job.runId,
+    sessionId: null,
     fileName: job.fileName,
     pathway: job.pathway,
     status: job.status,
     statusLine: job.statusLine,
     cadViewerUrl: job.cadViewerUrl,
+    stlPath: job.stlPath,
+    scadPath: job.scadPath,
     error: job.error,
     stages: job.stages,
   };
@@ -152,7 +124,6 @@ function snapshotJob(job) {
 
 function emitJob(job) {
   const payload = JSON.stringify(snapshotJob(job));
-
   if (payload === job.lastSnapshot) {
     return;
   }
@@ -175,7 +146,6 @@ function getStage(job, key) {
 
 function setStageActive(job, key, statusLine) {
   const nextIndex = job.stages.findIndex((stage) => stage.key === key);
-
   if (nextIndex === -1) {
     return;
   }
@@ -187,13 +157,14 @@ function setStageActive(job, key, statusLine) {
   }
 
   const nextStage = job.stages[nextIndex];
-
   if (nextStage.status !== "completed") {
     nextStage.status = "active";
   }
 
   job.currentStageKey = key;
-  job.status = terminalStatuses.has(job.status) ? job.status : "running";
+  if (!terminalStatuses.has(job.status)) {
+    job.status = "running";
+  }
 
   if (statusLine) {
     job.statusLine = statusLine;
@@ -204,13 +175,11 @@ function setStageActive(job, key, statusLine) {
 
 function completeStage(job, key, statusLine) {
   const stage = getStage(job, key);
-
   if (!stage) {
     return;
   }
 
   stage.status = "completed";
-
   if (job.currentStageKey === key) {
     job.currentStageKey = null;
   }
@@ -223,18 +192,11 @@ function completeStage(job, key, statusLine) {
 }
 
 function failJob(job, message, stageKey = job.currentStageKey ?? "cad_viewer") {
-  if (isTransientFetchError(message)) {
-    job.statusLine = "Transient fetch issue reported by OpenCode. Continuing to monitor the run.";
-    emitJob(job);
-    return;
-  }
-
   if (job.status === "failed") {
     return;
   }
 
   const stage = getStage(job, stageKey);
-
   if (stage) {
     stage.status = "failed";
   }
@@ -243,32 +205,28 @@ function failJob(job, message, stageKey = job.currentStageKey ?? "cad_viewer") {
   job.error = message;
   job.statusLine = message;
   job.currentStageKey = stageKey;
-
-  if (job.eventAbortController && !job.eventAbortController.signal.aborted) {
-    job.eventAbortController.abort();
-  }
-
   emitJob(job);
 }
 
-function completeJob(job, viewerUrl) {
-  if (!viewerUrl) {
-    failJob(job, "Run finished without a valid CAD Viewer link.", "cad_viewer");
+function completeJob(job, { cadViewerUrl, stlPath, scadPath }) {
+  const stage = getStage(job, "cad_viewer");
+  if (stage && stage.status !== "completed") {
+    stage.status = cadViewerUrl ? "completed" : "failed";
+  }
+
+  job.cadViewerUrl = cadViewerUrl;
+  job.stlPath = stlPath;
+  job.scadPath = scadPath;
+
+  if (!cadViewerUrl) {
+    failJob(job, "Run completed, but CAD Viewer did not return a valid handoff link.", "cad_viewer");
     return;
   }
 
-  job.cadViewerUrl = viewerUrl;
-  setStageActive(job, "stl_export", "STL export completed.");
-  completeStage(job, "stl_export", "STL export completed.");
-  setStageActive(job, "cad_viewer", "CAD Viewer handoff detected.");
-  completeStage(job, "cad_viewer", "CAD Viewer handoff ready.");
   job.status = "completed";
   job.error = null;
-
-  if (job.eventAbortController && !job.eventAbortController.signal.aborted) {
-    job.eventAbortController.abort();
-  }
-
+  job.currentStageKey = null;
+  job.statusLine = "Deterministic pipeline completed. CAD Viewer handoff ready.";
   emitJob(job);
 }
 
@@ -313,11 +271,33 @@ function normalizeError(error) {
     return error;
   }
 
-  return "Unexpected OpenCode failure.";
+  return "Unexpected pipeline failure.";
 }
 
-function isTransientFetchError(error) {
-  return normalizeError(error).toLowerCase() === "fetch failed";
+async function runCommand(command, args, { cwd = repoRoot } = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { cwd });
+    let stdout = "";
+    let stderr = "";
+
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+    });
+
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk;
+    });
+
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code === 0) {
+        resolve({ stdout, stderr });
+        return;
+      }
+
+      reject(new Error((stderr || stdout).trim() || `${command} exited with code ${code}.`));
+    });
+  });
 }
 
 async function parseFormData(req, pathname) {
@@ -344,666 +324,191 @@ async function parseFormData(req, pathname) {
   return request.formData();
 }
 
-async function getOpencodeRuntime() {
-  if (!opencodeRuntimePromise) {
-    opencodeRuntimePromise = (async () => {
-      const existingBaseUrl = `http://${opencodeHost}:${opencodePort}`;
+async function readManifest(manifestPath) {
+  const contents = await fs.readFile(manifestPath, "utf8");
+  return JSON.parse(contents);
+}
 
-      try {
-        const server = await createOpencodeServer({
-          hostname: opencodeHost,
-          port: opencodePort,
-        });
-        const client = createOpencodeClient({
-          baseUrl: server.url,
-          directory: repoRoot,
-        });
+async function finalizeFromManifest(job, manifestPath, pipelineResult = {}) {
+  job.manifestPath = manifestPath;
+  const manifest = await readManifest(manifestPath);
 
-        return { server, client };
-      } catch (error) {
-        const client = createOpencodeClient({
-          baseUrl: existingBaseUrl,
-          directory: repoRoot,
-        });
+  const manifestStlPath = manifest?.artifacts?.stl ?? pipelineResult.stlPath ?? null;
+  const manifestScadPath = manifest?.artifacts?.finalScad ?? null;
+  let manifestCadViewerUrl = manifest?.artifacts?.cadViewerUrl ?? pipelineResult.cadViewerUrl ?? null;
 
-        await client.command.list();
-        return { server: null, client };
-      }
-    })().catch((error) => {
-      opencodeRuntimePromise = null;
-      throw error;
+  if (!manifestCadViewerUrl && manifestStlPath) {
+    manifestCadViewerUrl = await createCadViewerUrlForFile({
+      repoRoot,
+      scriptDir: cadViewerScriptDir,
+      artifactRoot: job.outputDir,
+      filePath: manifestStlPath,
     });
   }
 
-  return opencodeRuntimePromise;
-}
-
-function extractCadViewerUrl(text) {
-  if (!text) {
-    return null;
-  }
-
-  const matches = text.match(/https?:\/\/(?:127\.0\.0\.1|localhost):\d+\/\?[^\s"'<>]+/g) ?? [];
-
-  for (const candidate of matches) {
-    try {
-      const parsed = new URL(candidate);
-      const dir = parsed.searchParams.get("dir");
-
-      if (dir && path.isAbsolute(dir)) {
-        return candidate;
-      }
-    } catch {
-      // Ignore malformed links and keep scanning.
-    }
-  }
-
-  return null;
-}
-
-function collectTextFromParts(parts) {
-  const values = [];
-
-  for (const part of parts) {
-    if (part.type === "text") {
-      values.push(part.text);
-    }
-
-    if (part.type === "tool") {
-      if (typeof part.state.output === "string") {
-        values.push(part.state.output);
-      }
-
-      if (typeof part.state.raw === "string") {
-        values.push(part.state.raw);
-      }
-    }
-  }
-
-  return values.join("\n");
-}
-
-async function findCadViewerUrlInSession(job, client) {
-  const response = await client.session.messages({
-    path: { id: job.sessionId },
-  });
-
-  const messages = [...response.data].reverse();
-
-  for (const message of messages) {
-    if (message.info.role !== "assistant") {
-      continue;
-    }
-
-    const viewerUrl = extractCadViewerUrl(collectTextFromParts(message.parts));
-
-    if (viewerUrl) {
-      return viewerUrl;
-    }
-  }
-
-  return null;
-}
-
-function eventSessionId(event) {
-  if (!event?.properties) {
-    return null;
-  }
-
-  return (
-    event.properties.sessionID ??
-    event.properties.info?.sessionID ??
-    event.properties.part?.sessionID ??
-    null
-  );
-}
-
-function jobTracksSession(job, sessionId) {
-  return Boolean(sessionId && job.knownSessionIds.has(sessionId));
-}
-
-function trackSession(job, sessionId) {
-  if (sessionId) {
-    job.knownSessionIds.add(sessionId);
-  }
-}
-
-function matchArtworkStageFromTaskTool(part) {
-  if (part.tool !== "task") {
-    return null;
-  }
-
-  return artworkSubagentStageByType[part.state.input?.subagent_type] ?? null;
-}
-
-function matchLateStageFromBashTool(part) {
-  if (part.tool !== "bash") {
-    return null;
-  }
-
-  const command = String(part.state.input?.command ?? "").toLowerCase();
-
-  if (command.includes("validate.sh")) {
-    return "validate";
-  }
-
-  if (command.includes("multi-preview.sh") || command.includes("preview.sh")) {
-    return "preview";
-  }
-
-  if (command.includes("export-stl.sh")) {
-    return "stl_export";
-  }
-
-  return null;
-}
-
-function buildAutomaticQuestionAnswers(questionRequest) {
-  return questionRequest.questions.map((question) => {
-    const recommendedOption = question.options.find((option) => option.label.includes("(Recommended)"));
-    const fallbackOption = question.options[0] ?? null;
-    const selectedOption = recommendedOption ?? fallbackOption;
-
-    return selectedOption ? [selectedOption.label] : [];
+  completeJob(job, {
+    cadViewerUrl: manifestCadViewerUrl,
+    stlPath: manifestStlPath,
+    scadPath: manifestScadPath,
   });
 }
 
-async function autoApprovePermission(client, job, permission) {
-  const permissionLabel = permission.permission ?? permission.tool ?? permission.id;
-  job.statusLine = `Approving runtime permission: ${permissionLabel}.`;
-  emitJob(job);
-
-  await client.postSessionIdPermissionsPermissionId({
-    path: {
-      id: permission.sessionID,
-      permissionID: permission.id,
-    },
-    body: {
-      response: "once",
-    },
-  });
-}
-
-async function autoReplyToQuestion(client, job, questionRequest) {
-  const questionLabel = questionRequest.questions[0]?.header ?? "workflow prompt";
-  const answers = buildAutomaticQuestionAnswers(questionRequest);
-
-  if (answers.some((answer) => answer.length === 0)) {
-    failJob(job, `Run requires manual input for ${questionLabel}.`, job.currentStageKey ?? "openscad_build");
-    return;
+async function createCadBundle(job) {
+  if (!job.manifestPath || !job.scadPath) {
+    throw new Error("No CAD source bundle is available for this job yet.");
   }
 
-  job.statusLine = `Answering workflow question: ${questionLabel}.`;
-  emitJob(job);
+  const manifest = await readManifest(job.manifestPath);
+  const cleanedSvgPath = manifest?.artifacts?.cleanedSvg;
 
-  await client.question.reply({
-    requestID: questionRequest.id,
-    answers,
-  });
-}
+  if (!cleanedSvgPath) {
+    throw new Error("The CAD source SVG is missing from the manifest.");
+  }
 
-async function collectExportedStlFiles(directory) {
-  let entries;
+  const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "cad-bundle-"));
+  const bundleRoot = path.join(tempRoot, `${job.artifactName}-cad-bundle`);
+  const bundleScadPath = path.join(bundleRoot, path.relative(repoRoot, job.scadPath));
+  const bundleSvgPath = path.join(bundleRoot, path.relative(repoRoot, cleanedSvgPath));
+  const bundleManifestPath = path.join(bundleRoot, path.relative(repoRoot, job.manifestPath));
+  const bundleZipPath = path.join(tempRoot, `${job.artifactName}-cad-bundle.zip`);
+
+  await fs.mkdir(path.dirname(bundleScadPath), { recursive: true });
+  await fs.mkdir(path.dirname(bundleSvgPath), { recursive: true });
+  await fs.mkdir(path.dirname(bundleManifestPath), { recursive: true });
+  await fs.copyFile(job.scadPath, bundleScadPath);
+  await fs.copyFile(cleanedSvgPath, bundleSvgPath);
+  await fs.copyFile(job.manifestPath, bundleManifestPath);
 
   try {
-    entries = await fs.readdir(directory, { withFileTypes: true });
-  } catch {
-    return [];
-  }
-
-  const files = [];
-
-  for (const entry of entries) {
-    const entryPath = path.join(directory, entry.name);
-
-    if (entry.isDirectory()) {
-      files.push(...(await collectExportedStlFiles(entryPath)));
-      continue;
-    }
-
-    if (entry.isFile() && entry.name.toLowerCase().endsWith(".stl")) {
-      files.push(entryPath);
-    }
-  }
-
-  return files;
-}
-
-function choosePrimaryStlFile(files) {
-  if (files.length === 0) {
-    return null;
-  }
-
-  return (
-    files.find((filePath) => path.basename(filePath).toLowerCase().includes("plaque")) ??
-    files.find((filePath) => path.basename(filePath).toLowerCase().includes("all")) ??
-    files[0]
-  );
-}
-
-async function probeCadViewerServer(portNumber) {
-  try {
-    const response = await fetch(`http://${cadViewerHost}:${portNumber}/__cad/server`, {
-      signal: AbortSignal.timeout(1500),
-    });
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const payload = await response.json();
-
-    if (
-      payload?.app === "cad-viewer" &&
-      payload?.dynamicRoot === true &&
-      Number(payload?.serverApiVersion ?? 0) >= 2
-    ) {
-      return `http://${cadViewerHost}:${portNumber}`;
-    }
-  } catch {
-    return null;
-  }
-
-  return false;
-}
-
-async function ensureCadViewerBaseUrl() {
-  for (let portNumber = cadViewerStartPort; portNumber < cadViewerStartPort + 10; portNumber += 1) {
-    const existingBaseUrl = await probeCadViewerServer(portNumber);
-
-    if (typeof existingBaseUrl === "string") {
-      return existingBaseUrl;
-    }
-
-    if (existingBaseUrl === false) {
-      continue;
-    }
-
-    const child = spawn(
-      "npm",
-      [
-        "--prefix",
-        cadViewerScriptDir,
-        "run",
-        "start",
-        "--",
-        "--host",
-        cadViewerHost,
-        "--port",
-        String(portNumber),
-        "--shutdown-after",
-        "12h",
-      ],
-      {
-        cwd: repoRoot,
-        detached: true,
-        stdio: "ignore",
-      },
-    );
-
-    child.unref();
-
-    for (let attempt = 0; attempt < 20; attempt += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      const startedBaseUrl = await probeCadViewerServer(portNumber);
-
-      if (typeof startedBaseUrl === "string") {
-        return startedBaseUrl;
-      }
-    }
-  }
-
-  return null;
-}
-
-async function createFallbackCadViewerUrl() {
-  const stlFiles = await collectExportedStlFiles(exportsDir);
-  const primaryStlFile = choosePrimaryStlFile(stlFiles);
-
-  if (!primaryStlFile) {
-    return null;
-  }
-
-  const baseUrl = await ensureCadViewerBaseUrl();
-
-  if (!baseUrl) {
-    return null;
-  }
-
-  return `${baseUrl}/?dir=${encodeURIComponent(exportsDir)}&file=${encodeURIComponent(primaryStlFile)}`;
-}
-
-async function finalizeJob(job, client) {
-  if (job.finalizing || terminalStatuses.has(job.status) || !job.commandStarted) {
-    return;
-  }
-
-  job.finalizing = true;
-
-  try {
-    job.statusLine = "Session finished. Checking the final CAD Viewer handoff.";
-    emitJob(job);
-
-    const viewerUrl =
-      job.cadViewerUrl ??
-      (await findCadViewerUrlInSession(job, client)) ??
-      (await createFallbackCadViewerUrl());
-
-    if (!viewerUrl) {
-      setStageActive(job, "cad_viewer", "The run finished without a CAD Viewer handoff.");
-      failJob(job, "Run finished without a valid CAD Viewer link.", "cad_viewer");
-      return;
-    }
-
-    completeJob(job, viewerUrl);
-  } catch (error) {
-    failJob(job, `Failed to inspect final session output: ${normalizeError(error)}`, "cad_viewer");
+    await runCommand("zip", ["-rq", bundleZipPath, path.basename(bundleRoot)], { cwd: tempRoot });
+    const contents = await fs.readFile(bundleZipPath);
+    return {
+      contents,
+      fileName: `${job.artifactName}-cad-bundle.zip`,
+      contentType: "application/zip",
+    };
   } finally {
-    job.finalizing = false;
+    await fs.rm(tempRoot, { recursive: true, force: true });
   }
 }
 
-function applyToolStage(job, stageKey, part) {
-  if (!stageKey) {
+async function handlePipelineMessage(job, event) {
+  if (event.type === "stage") {
+    if (!event.stage) {
+      return;
+    }
+
+    if (event.status === "active") {
+      setStageActive(job, event.stage, event.message);
+      return;
+    }
+
+    if (event.status === "completed") {
+      completeStage(job, event.stage, event.message);
+      return;
+    }
+
+    if (event.status === "failed") {
+      failJob(job, event.message || `Failed during ${stageLabels[event.stage] ?? event.stage}.`, event.stage);
+    }
+
     return;
   }
 
-  const title = part.state.title || `Running ${stageLabels[stageKey]}.`;
-
-  if (part.state.status === "error") {
-    if (isTransientFetchError(part.state.error)) {
-      setStageActive(job, stageKey, `Transient fetch issue during ${stageLabels[stageKey]}. Continuing.`);
-      return;
-    }
-
-    failJob(job, part.state.error || `Failed during ${stageLabels[stageKey]}.`, stageKey);
-    return;
-  }
-
-  setStageActive(job, stageKey, title);
-
-  if (part.state.status === "completed") {
-    completeStage(job, stageKey, `${stageLabels[stageKey]} completed.`);
-
-    if (stageKey === "svg_cleanup") {
-      setStageActive(job, "openscad_build", `Starting ${stageLabels.openscad_build}.`);
-    }
-  }
-}
-
-async function handleEvent(job, client, event) {
-  switch (event.type) {
-    case "permission.asked": {
-      await autoApprovePermission(client, job, event.properties);
-      return;
-    }
-
-    case "question.asked": {
-      await autoReplyToQuestion(client, job, event.properties);
-      return;
-    }
-
-    case "command.executed": {
-      job.commandStarted = true;
-      job.status = "running";
-      job.statusLine = `Running saved command \`${event.properties.name}\`.`;
-      emitJob(job);
-
-      const initialStage = job.pathway === "artwork" ? "magicimage" : "openscad_build";
-      setStageActive(job, initialStage, `Starting ${stageLabels[initialStage]}.`);
-      return;
-    }
-
-    case "todo.updated": {
-      const activeTodo = event.properties.todos.find((todo) => todo.status === "in_progress");
-      const nextTodo = activeTodo ?? event.properties.todos[0];
-
-      if (nextTodo?.content) {
-        job.statusLine = nextTodo.content;
-        emitJob(job);
-      }
-
-      return;
-    }
-
-    case "session.idle": {
-      if (event.properties.sessionID === job.sessionId) {
-        await finalizeJob(job, client);
-      }
-      return;
-    }
-
-    case "session.status": {
-      if (event.properties.status.type === "busy" && !terminalStatuses.has(job.status)) {
-        job.status = "running";
-        emitJob(job);
-      }
-
-      if (event.properties.status.type === "idle" && !terminalStatuses.has(job.status)) {
-        job.statusLine = "OpenCode is finishing the current response.";
-        emitJob(job);
-      }
-
-      return;
-    }
-
-    case "session.error": {
-      if (isTransientFetchError(event.properties.error)) {
-        job.statusLine = "Transient fetch issue reported by OpenCode. Continuing to monitor the run.";
-        emitJob(job);
+  if (event.type === "result") {
+    if (event.status === "completed") {
+      if (!event.manifestPath) {
+        failJob(job, "Pipeline completed without a manifest path.", "cad_viewer");
         return;
       }
 
-      failJob(job, normalizeError(event.properties.error));
+      await finalizeFromManifest(job, event.manifestPath, event);
       return;
     }
 
-    case "message.updated": {
-      const error = event.properties.info.error;
-
-      if (error) {
-        if (isTransientFetchError(error)) {
-          job.statusLine = "Transient fetch issue reported by OpenCode. Continuing to monitor the run.";
-          emitJob(job);
-          return;
-        }
-
-        failJob(job, normalizeError(error));
-      }
-
-      return;
-    }
-
-    case "message.part.updated": {
-      const { part, delta } = event.properties;
-
-      if (part.type === "subtask") {
-        const stageKey = artworkSubagentStageByType[part.agent] ?? null;
-        if (stageKey) {
-          setStageActive(job, stageKey, part.description || `Running ${stageLabels[stageKey]}.`);
-        }
-        return;
-      }
-
-      if (part.type === "agent") {
-        const stageKey = artworkSubagentStageByType[part.name] ?? null;
-        if (stageKey) {
-          setStageActive(job, stageKey, `Running ${stageLabels[stageKey]}.`);
-        }
-        return;
-      }
-
-      if (part.type === "tool") {
-        trackSession(job, part.state.metadata?.sessionId);
-
-        const stageKey = matchArtworkStageFromTaskTool(part) ?? matchLateStageFromBashTool(part);
-
-        if (stageKey) {
-          applyToolStage(job, stageKey, part);
-        }
-
-        const searchable = JSON.stringify({
-          tool: part.tool,
-          state: part.state,
-          metadata: part.metadata,
-        });
-
-        const viewerUrl = extractCadViewerUrl(searchable);
-        if (viewerUrl) {
-          job.cadViewerUrl = viewerUrl;
-          setStageActive(job, "cad_viewer", "Preparing CAD Viewer handoff.");
-          completeStage(job, "cad_viewer", "CAD Viewer handoff ready.");
-        }
-
-        return;
-      }
-
-      if (part.type === "text") {
-        const text = `${part.text}\n${delta ?? ""}`;
-        const viewerUrl = extractCadViewerUrl(text);
-
-        if (viewerUrl) {
-          job.cadViewerUrl = viewerUrl;
-          setStageActive(job, "cad_viewer", "Preparing CAD Viewer handoff.");
-          completeStage(job, "cad_viewer", "CAD Viewer handoff ready.");
-          return;
-        }
-
-        if (text.toLowerCase().includes("cad viewer")) {
-          setStageActive(job, "cad_viewer", "Preparing CAD Viewer handoff.");
-        }
-      }
-
-      return;
-    }
-
-    default:
-      return;
-  }
-}
-
-async function consumeJobEvents(job, client, eventStream, controller) {
-  for await (const event of eventStream.stream) {
-    if (controller.signal.aborted) {
-      break;
-    }
-
-    if (!event || !jobTracksSession(job, eventSessionId(event))) {
-      continue;
-    }
-
-    await handleEvent(job, client, event);
-
-    if (terminalStatuses.has(job.status)) {
-      break;
+    if (event.status === "failed") {
+      failJob(job, event.error || "Deterministic pipeline failed.");
     }
   }
 }
 
-function waitFor(ms, signal) {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      signal?.removeEventListener("abort", onAbort);
-      resolve();
-    }, ms);
-
-    function onAbort() {
-      clearTimeout(timer);
-      reject(new Error("Aborted"));
-    }
-
-    if (signal?.aborted) {
-      onAbort();
-      return;
-    }
-
-    signal?.addEventListener("abort", onAbort, { once: true });
-  });
-}
-
-async function startWatchingJobEvents(job, client) {
-  const controller = new AbortController();
-  job.eventAbortController = controller;
-
-  void (async () => {
-    while (!controller.signal.aborted && !terminalStatuses.has(job.status)) {
-      try {
-        const eventStream = await client.event.subscribe({ signal: controller.signal });
-        await consumeJobEvents(job, client, eventStream, controller);
-      } catch (error) {
-        if (controller.signal.aborted || terminalStatuses.has(job.status)) {
-          break;
-        }
-
-        job.statusLine = `Progress stream disconnected. Reconnecting after ${normalizeError(error)}.`;
-        emitJob(job);
-      }
-
-      if (controller.signal.aborted || terminalStatuses.has(job.status)) {
-        break;
-      }
-
-      try {
-        await waitFor(1000, controller.signal);
-      } catch {
-        break;
-      }
-    }
-  })();
-}
-
-async function runCommand(job, client, messageId) {
-  try {
-    await client.session.command({
-      path: { id: job.sessionId },
-      body: {
-        command: job.commandName,
-        arguments: "",
-        messageID: messageId,
-      },
-    });
-
-    job.commandStarted = true;
-    if (!terminalStatuses.has(job.status)) {
-      job.status = "running";
-      emitJob(job);
-    }
-  } catch (error) {
-    failJob(job, normalizeError(error));
-  }
-}
-
-async function startJobRun(job) {
-  const runtime = await getOpencodeRuntime();
-  const { data: session } = await runtime.client.session.create({
-    body: { title: `${job.pathway}: ${job.fileName}` },
-  });
-
-  job.sessionId = session.id;
-  trackSession(job, session.id);
-  job.statusLine = "Session created. Attaching the file.";
-  emitJob(job);
-
-  await startWatchingJobEvents(job, runtime.client);
-
-  const attachment = await runtime.client.session.prompt({
-    path: { id: session.id },
-    body: {
-      noReply: true,
-      parts: [
-        {
-          type: "file",
-          mime: "image/png",
-          filename: job.fileName,
-          url: pathToFileURL(job.storedFilePath).href,
-        },
-      ],
+function startJobRun(job) {
+  const child = spawn(
+    process.execPath,
+    [
+      pipelineScriptPath,
+      "--input",
+      job.storedFilePath,
+      "--output-dir",
+      job.outputDir,
+      "--name",
+      job.artifactName,
+    ],
+    {
+      cwd: repoRoot,
+      stdio: ["ignore", "pipe", "pipe"],
     },
+  );
+
+  job.childProcess = child;
+  job.status = "running";
+  job.statusLine = "Launching the deterministic artwork pipeline.";
+  emitJob(job);
+
+  let stdoutBuffer = "";
+
+  child.stdout.on("data", (chunk) => {
+    stdoutBuffer += chunk.toString();
+    const lines = stdoutBuffer.split("\n");
+    stdoutBuffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      if (!trimmedLine) {
+        continue;
+      }
+
+      try {
+        const event = JSON.parse(trimmedLine);
+        void handlePipelineMessage(job, event);
+      } catch {
+        job.statusLine = trimmedLine;
+        emitJob(job);
+      }
+    }
   });
 
-  job.statusLine = "File attached. Starting the saved workflow.";
-  emitJob(job);
-  void runCommand(job, runtime.client, attachment.data.info.id);
+  child.stderr.on("data", (chunk) => {
+    job.stderrBuffer += chunk.toString();
+  });
+
+  child.on("error", (error) => {
+    failJob(job, normalizeError(error));
+  });
+
+  child.on("close", async (code) => {
+    if (stdoutBuffer.trim()) {
+      try {
+        await handlePipelineMessage(job, JSON.parse(stdoutBuffer.trim()));
+      } catch {
+        // Ignore trailing non-JSON output.
+      }
+    }
+
+    if (!terminalStatuses.has(job.status) && code !== 0) {
+      const stderrMessage = job.stderrBuffer.trim();
+      failJob(job, stderrMessage || `Deterministic pipeline exited with code ${code}.`);
+      return;
+    }
+
+    if (!terminalStatuses.has(job.status) && job.manifestPath) {
+      try {
+        await finalizeFromManifest(job, job.manifestPath);
+      } catch (error) {
+        failJob(job, `Failed to read the pipeline manifest: ${normalizeError(error)}`, "cad_viewer");
+      }
+    }
+  });
 }
 
 async function handleCreateJob(req, res, pathname) {
@@ -1029,13 +534,19 @@ async function handleCreateJob(req, res, pathname) {
     return;
   }
 
+  if (pathway !== "artwork") {
+    sendJson(res, 400, {
+      error: "Deterministic mode currently supports the Artwork pathway only.",
+    });
+    return;
+  }
+
   if (files.length !== 1) {
     sendJson(res, 400, { error: "Upload exactly one file." });
     return;
   }
 
   const uploadedFile = files[0];
-
   if (!(uploadedFile instanceof File)) {
     sendJson(res, 400, { error: "Missing file upload." });
     return;
@@ -1047,7 +558,6 @@ async function handleCreateJob(req, res, pathname) {
   }
 
   const buffer = Buffer.from(await uploadedFile.arrayBuffer());
-
   if (!isPngBuffer(buffer)) {
     sendJson(res, 400, { error: "The uploaded file is not a valid PNG." });
     return;
@@ -1056,22 +566,24 @@ async function handleCreateJob(req, res, pathname) {
   const storedFilePath = path.join(uploadsDir, buildStoredFileName(uploadedFile.name));
   await fs.writeFile(storedFilePath, buffer);
 
+  const artifactName = sanitizeBaseName(uploadedFile.name);
+  const jobOutputDir = path.join(exportsDir, `${new Date().toISOString().replace(/[.:]/g, "-")}-${artifactName}`);
+
   const job = createJob({
     fileName: uploadedFile.name,
     pathway,
     storedFilePath,
+    outputDir: jobOutputDir,
+    artifactName,
   });
 
   jobs.set(job.id, job);
   activeJobId = job.id;
 
   try {
-    await startJobRun(job);
+    startJobRun(job);
     sendJson(res, 200, snapshotJob(job));
   } catch (error) {
-    if (job.eventAbortController && !job.eventAbortController.signal.aborted) {
-      job.eventAbortController.abort();
-    }
     jobs.delete(job.id);
     activeJobId = null;
     sendJson(res, 500, { error: normalizeError(error) });
@@ -1095,14 +607,10 @@ function attachSseClient(job, res) {
     }
   }, 15000);
 
-  reqCleanup();
-
-  function reqCleanup() {
-    res.on("close", () => {
-      clearInterval(heartbeat);
-      job.clients.delete(res);
-    });
-  }
+  res.on("close", () => {
+    clearInterval(heartbeat);
+    job.clients.delete(res);
+  });
 }
 
 function sendJson(res, statusCode, payload) {
@@ -1125,6 +633,54 @@ async function serveStatic(res, fileInfo) {
   }
 }
 
+async function handleDownloadJobArtifact(res, job, artifactType) {
+  if (artifactType === "cad") {
+    let cadBundle;
+
+    try {
+      cadBundle = await createCadBundle(job);
+    } catch (error) {
+      sendJson(res, 404, { error: normalizeError(error) });
+      return;
+    }
+
+    res.writeHead(200, {
+      "Content-Type": cadBundle.contentType,
+      "Content-Length": cadBundle.contents.byteLength,
+      "Content-Disposition": `attachment; filename="${cadBundle.fileName}"`,
+    });
+    res.end(cadBundle.contents);
+    return;
+  }
+
+  const filePath = job.stlPath;
+
+  if (!filePath) {
+    sendJson(res, 404, {
+      error: "No STL is available for this job yet.",
+    });
+    return;
+  }
+
+  let contents;
+
+  try {
+    contents = await fs.readFile(filePath);
+  } catch {
+    sendJson(res, 404, {
+      error: "The STL file could not be found on disk.",
+    });
+    return;
+  }
+
+  res.writeHead(200, {
+    "Content-Type": "model/stl",
+    "Content-Length": contents.byteLength,
+    "Content-Disposition": `attachment; filename="${path.basename(filePath)}"`,
+  });
+  res.end(contents);
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "127.0.0.1"}`);
   const pathname = url.pathname;
@@ -1145,6 +701,19 @@ const server = http.createServer(async (req, res) => {
       }
 
       attachSseClient(job, res);
+      return;
+    }
+
+    const downloadMatch = pathname.match(/^\/api\/jobs\/([^/]+)\/download(?:\/(stl|cad))?$/);
+    if (req.method === "GET" && downloadMatch) {
+      const job = jobs.get(downloadMatch[1]);
+
+      if (!job) {
+        sendJson(res, 404, { error: "Unknown job." });
+        return;
+      }
+
+      await handleDownloadJobArtifact(res, job, downloadMatch[2] ?? "stl");
       return;
     }
 
@@ -1174,18 +743,16 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(port, "127.0.0.1", () => {
-  console.log(`OpenCode Workshop listening on http://127.0.0.1:${port}`);
+  console.log(`Local Workshop listening on http://127.0.0.1:${port}`);
 });
 
 for (const signal of ["SIGINT", "SIGTERM"]) {
-  process.on(signal, async () => {
-    try {
-      if (opencodeRuntimePromise) {
-        const runtime = await opencodeRuntimePromise;
-        runtime.server?.close();
-      }
-    } finally {
-      server.close(() => process.exit(0));
+  process.on(signal, () => {
+    const job = activeJob();
+    if (job?.childProcess && !job.childProcess.killed) {
+      job.childProcess.kill("SIGTERM");
     }
+
+    server.close(() => process.exit(0));
   });
 }

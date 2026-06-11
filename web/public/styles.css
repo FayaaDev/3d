@@ -363,6 +363,13 @@ textarea {
   margin: 0;
 }
 
+.result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 18px;
+}
+
 .viewer-link,
 .secondary-button {
   border: 0;
@@ -370,7 +377,7 @@ textarea {
   cursor: pointer;
   display: inline-flex;
   justify-content: center;
-  margin-top: 18px;
+  margin-top: 0;
   min-height: 48px;
   padding: 0 20px;
   text-decoration: none;

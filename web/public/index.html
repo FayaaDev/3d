@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>OpenCode Workshop</title>
+    <title>Local Relief Workshop</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body data-theme="neutral">
@@ -63,27 +63,35 @@
                 <dd id="summaryProgress">0 / 0 complete</dd>
               </div>
               <div>
-                <dt>Session</dt>
+                <dt>Run ID</dt>
                 <dd id="summarySession">Starting...</dd>
               </div>
             </dl>
 
             <p class="summary-copy" id="summaryCopy">
-              Waiting for the saved command to start.
+              Waiting for the deterministic pipeline to start.
             </p>
 
             <div class="result-card hidden" id="resultCard">
               <p class="result-label" id="resultLabel">Handoff Ready</p>
               <p class="result-text" id="resultText"></p>
-              <a
-                class="viewer-link hidden"
-                id="viewerLink"
-                href="#"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Open CAD Viewer
-              </a>
+              <div class="result-actions">
+                <a
+                  class="viewer-link hidden"
+                  id="viewerLink"
+                  href="#"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Open CAD Viewer
+                </a>
+                <a class="secondary-button hidden" id="downloadLink" href="#" download>
+                  Download STL
+                </a>
+                <a class="secondary-button hidden" id="downloadCadLink" href="#" download>
+                  Download CAD Bundle
+                </a>
+              </div>
             </div>
 
             <button class="secondary-button hidden" id="startOverButton" type="button">
@@ -123,9 +131,11 @@
             class="choice-card choice-card-technicaldrawing"
             type="button"
             data-pathway="technicaldrawing"
+            disabled
+            aria-disabled="true"
           >
             <strong>Technical Drawing</strong>
-            <span>Use the blueprint rebuild workflow and go straight into OpenSCAD.</span>
+            <span>Deterministic rebuild is not wired yet. Use Artwork for the fixed local pipeline.</span>
           </button>
         </div>
 
