@@ -7,6 +7,18 @@ node_modules/
 # env/secrets
 .env
 .env.local
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+.dev.vars*
+!.dev.vars.example
+*.pem
+*.key
+credentials.json
+service-account*.json
+__pycache__/
+*.py[cod]
 
 # logs
 *.log
